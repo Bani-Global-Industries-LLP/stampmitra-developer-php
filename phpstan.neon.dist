@@ -1,0 +1,9 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+        - examples
+        - scripts
+    excludePaths:
+        - examples/laravel_webhook.php # needs Laravel to analyse
