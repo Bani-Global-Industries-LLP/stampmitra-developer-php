@@ -56,6 +56,9 @@ abstract class AbstractResource
         if (trim($value) === '') {
             throw ValidationError::forField($name, "$name must not be empty");
         }
+        if ($value === '.' || $value === '..') {
+            throw ValidationError::forField($name, "$name must not be a dot segment");
+        }
 
         return rawurlencode($value);
     }

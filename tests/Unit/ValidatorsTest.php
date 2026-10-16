@@ -79,6 +79,16 @@ final class ValidatorsTest extends TestCase
         self::assertSame('{"pan":"nope"}', $fake->lastBody());
     }
 
+    public function testPathSegmentsAreEncodedAndDotSegmentsRejected(): void
+    {
+        $fake = new FakeClient([FakeClient::json(200, ['status' => 'x'])]);
+        $fake->client()->orders->get('a/b ?#');
+        self::assertSame('https://api-b2b.stampmitra.in/v1/orders/a%2Fb%20%3F%23', (string) $fake->requests[0]->getUri());
+
+        $this->expectException(ValidationError::class);
+        $fake->client()->orders->get('..');
+    }
+
     public function testOrderCreateRequiresFields(): void
     {
         $fake = new FakeClient();

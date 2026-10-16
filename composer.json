@@ -45,6 +45,9 @@
             "php-http/discovery": false
         }
     },
+    "archive": {
+        "exclude": ["/vendor", "/composer.lock", "/composer-local.*", "/.phpunit.cache", "/.php-cs-fixer.cache", "/.idea", "/.vscode"]
+    },
     "scripts": {
         "test": "phpunit --testsuite unit",
         "test:conformance": "phpunit --testsuite conformance",
