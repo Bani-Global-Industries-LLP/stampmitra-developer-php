@@ -5,6 +5,9 @@
     "license": "MIT",
     "keywords": ["stampmitra", "kyc", "pan", "gstin", "estamp", "india", "verification", "sdk"],
     "homepage": "https://developer.stampmitra.in",
+    "authors": [
+        {"name": "StampMitra / Bani Global Industries LLP", "homepage": "https://developer.stampmitra.in"}
+    ],
     "support": {
         "docs": "https://developer.stampmitra.in/docs",
         "issues": "https://github.com/Bani-Global-Industries-LLP/stampmitra-developer-php/issues",
