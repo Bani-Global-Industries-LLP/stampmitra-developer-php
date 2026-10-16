@@ -50,12 +50,10 @@ final class Validators
         return self::match($value, self::UDYAM, $field, 'must match the format UDYAM-XX-00-0000000');
     }
 
-    /** Spaces and hyphens are stripped (MH-12 AB 1234 becomes MH12AB1234). */
+    /** Trimmed and upper-cased only; separators such as "MH-12 AB 1234" are rejected, like the API does. */
     public static function vehicleNumber(string $value, string $field = 'vehicleNumber'): string
     {
-        $clean = (string) preg_replace('/[\s-]+/', '', $value);
-
-        return self::match($clean, self::VEHICLE_NUMBER, $field, 'must be an Indian vehicle registration number, e.g. MH12AB1234');
+        return self::match($value, self::VEHICLE_NUMBER, $field, 'must be an Indian vehicle registration number, e.g. MH12AB1234');
     }
 
     public static function bankAccount(string $value, string $field = 'accountNumber'): string
@@ -70,9 +68,7 @@ final class Validators
 
     public static function drivingLicense(string $value, string $field = 'dlNumber'): string
     {
-        $clean = (string) preg_replace('/[\s-]+/', '', $value);
-
-        return self::match($clean, self::DRIVING_LICENSE, $field, 'must match the format MH1420110012345');
+        return self::match($value, self::DRIVING_LICENSE, $field, 'must match the format MH1420110012345');
     }
 
     public static function voterId(string $value, string $field = 'voterId'): string

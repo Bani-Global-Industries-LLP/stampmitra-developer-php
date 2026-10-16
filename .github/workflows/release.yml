@@ -16,7 +16,8 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-      - run: composer install --no-interaction --prefer-dist
+      - name: composer install (retried on transient GitHub download failures)
+        run: for i in 1 2 3; do composer install --no-interaction --prefer-dist && exit 0; sleep 10; done; exit 1
       - name: Tag matches StampMitra::VERSION
         run: |
           v="$(php -r 'require "vendor/autoload.php"; echo StampMitra\StampMitra::VERSION;')"

@@ -53,10 +53,14 @@ final class Webhook
         string $payload,
         string $timestamp,
         string $signature,
+        #[\SensitiveParameter]
         string $secret,
         int $toleranceSeconds = self::DEFAULT_TOLERANCE,
         ?int $now = null,
     ): ?string {
+        if ($secret === '') {
+            throw new SignatureVerificationError('Webhook secret must not be empty', null, 'MISSING_SECRET');
+        }
         if (preg_match('/^[0-9]{1,15}$/', $timestamp) !== 1) {
             return self::REASON_INVALID_TIMESTAMP;
         }

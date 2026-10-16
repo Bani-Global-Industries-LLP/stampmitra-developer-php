@@ -67,8 +67,8 @@ final class FakeClient implements ClientInterface
 
     public function lastBody(): string
     {
-        $last = $this->requests[array_key_last($this->requests)];
+        $last = $this->requests === [] ? null : $this->requests[count($this->requests) - 1];
 
-        return (string) $last->getBody();
+        return $last === null ? '' : (string) $last->getBody();
     }
 }

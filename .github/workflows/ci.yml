@@ -21,7 +21,9 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - run: composer install --no-interaction --prefer-dist
+          tools: composer:v2
+      - name: composer install (retried on transient GitHub download failures)
+        run: for i in 1 2 3; do composer install --no-interaction --prefer-dist && exit 0; sleep 10; done; exit 1
       - run: composer test
       - run: composer coverage:spec
 
@@ -33,7 +35,10 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-      - run: composer install --no-interaction --prefer-dist
+          tools: composer:v2
+      - name: composer install (retried on transient GitHub download failures)
+        run: for i in 1 2 3; do composer install --no-interaction --prefer-dist && exit 0; sleep 10; done; exit 1
+      - run: composer validate --strict --no-check-lock
       - run: composer cs
       - run: composer stan
 
@@ -45,5 +50,31 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-      - run: composer install --no-interaction --prefer-dist
+          tools: composer:v2
+      - name: composer install (retried on transient GitHub download failures)
+        run: for i in 1 2 3; do composer install --no-interaction --prefer-dist && exit 0; sleep 10; done; exit 1
       - run: composer audit
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Bani-Global-Industries-LLP/stampmitra-developer-openapi
+          path: .openapi
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+      - name: composer install (retried on transient GitHub download failures)
+        run: for i in 1 2 3; do composer install --no-interaction --prefer-dist && exit 0; sleep 10; done; exit 1
+      - name: Start the spec repo mock server
+        run: |
+          node .openapi/scripts/mock-server.mjs --port 4010 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4010/__mock/health && break; sleep 1; done
+      - run: composer test:conformance
+        env:
+          MOCK_SERVER_URL: http://127.0.0.1:4010
+          CONFORMANCE_REQUIRED: '1'

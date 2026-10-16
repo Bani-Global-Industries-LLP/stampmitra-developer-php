@@ -54,6 +54,7 @@ final class Transport
      * @param (callable(float): void)|null $sleeper Receives the delay in seconds; defaults to usleep
      */
     public function __construct(
+        #[\SensitiveParameter]
         private readonly string $apiKey,
         private readonly string $baseUrl,
         private readonly float $timeout,
@@ -73,6 +74,12 @@ final class Transport
                     usleep((int) round($seconds * 1_000_000));
                 }
             };
+    }
+
+    /** Keeps the API key out of var_dump()/print_r() output. @return array<string, string> */
+    public function __debugInfo(): array
+    {
+        return ['baseUrl' => $this->baseUrl];
     }
 
     /**

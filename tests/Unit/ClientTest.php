@@ -38,6 +38,36 @@ final class ClientTest extends TestCase
         self::assertNotSame('', $req->getHeaderLine('Idempotency-Key'));
     }
 
+    public function testBaseUrlMustBeHttpsExceptForLoopback(): void
+    {
+        $fake = new FakeClient();
+        self::assertSame('test', $fake->client(['baseUrl' => 'http://localhost:4010'])->environment);
+        self::assertSame('test', $fake->client(['baseUrl' => 'http://127.0.0.1:4010'])->environment);
+        self::assertSame('test', $fake->client(['baseUrl' => 'https://api.example.org'])->environment);
+        foreach (['http://api.example.org', 'ftp://example.org', 'api.example.org', ''] as $bad) {
+            try {
+                $fake->client(['baseUrl' => $bad]);
+                self::fail("accepted $bad");
+            } catch (\StampMitra\Exception\ValidationError $e) {
+                self::assertSame('baseUrl', $e->getField());
+            }
+        }
+    }
+
+    public function testApiKeyNeverAppearsInDumpsOrErrors(): void
+    {
+        $fake = new FakeClient([FakeClient::json(401, ['error' => ['code' => 'UNAUTHORIZED', 'message' => 'bad key']])]);
+        $client = $fake->client(['maxRetries' => 0]);
+        self::assertStringNotContainsString('abcdefgh12345678', print_r($client, true));
+        try {
+            $client->usage->summary();
+            self::fail('expected error');
+        } catch (AuthenticationError $e) {
+            self::assertStringNotContainsString('abcdefgh12345678', $e->getMessage());
+            self::assertStringNotContainsString('abcdefgh12345678', print_r($e->getBody(), true) . print_r($e->getHeaders(), true));
+        }
+    }
+
     public function testEnvironmentAndKeyHygiene(): void
     {
         $fake = new FakeClient();

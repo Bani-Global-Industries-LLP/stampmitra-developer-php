@@ -21,5 +21,6 @@ $order = $client->orders->create([
 echo json_encode($order->raw(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
 echo 'status: ', (string) $order->response()?->status, "\n";
 
-$status = $client->orders->getStatus((string) $order->get('id'));
+// Orders are addressed by the externalOrderId you supplied.
+$status = $client->orders->getStatus((string) $order->externalOrderId);
 echo json_encode($status->raw()), "\n";

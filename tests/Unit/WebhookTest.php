@@ -37,6 +37,14 @@ final class WebhookTest extends TestCase
         }
     }
 
+    public function testEmptySecretIsRejectedNotSilentlyAccepted(): void
+    {
+        $payload = '{"coreOrderId":"core_1"}';
+        $ts = (string) time();
+        $this->expectException(SignatureVerificationError::class);
+        Webhook::constructEvent($payload, $ts, Webhook::sign($payload, $ts, ''), '');
+    }
+
     public function testConstructEventParsesTypedEvent(): void
     {
         $payload = '{"coreOrderId":"core_1","coreEventType":"FULFILMENT_COMPLETED","orderId":"ord_1","extra":1}';
