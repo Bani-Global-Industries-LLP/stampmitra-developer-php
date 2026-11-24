@@ -12,7 +12,7 @@ final class SpecCoverageTest extends TestCase
     public function testEverySpecOperationHasAnSdkMethod(): void
     {
         $root = dirname(__DIR__, 2);
-        self::assertCount(31, SpecCoverage::specOperations($root));
+        self::assertCount(62, SpecCoverage::specOperations($root));
         self::assertSame([], SpecCoverage::missing($root), 'Spec operations missing from the SDK');
     }
 }

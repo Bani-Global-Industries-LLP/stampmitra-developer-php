@@ -32,7 +32,7 @@ final class ClientTest extends TestCase
         self::assertSame('Bearer sk_test_abcdefgh12345678', $req->getHeaderLine('Authorization'));
         self::assertSame('application/json', $req->getHeaderLine('Content-Type'));
         self::assertSame('application/json', $req->getHeaderLine('Accept'));
-        self::assertStringStartsWith('stampmitra-php/0.1.0 (PHP ', $req->getHeaderLine('User-Agent'));
+        self::assertStringStartsWith('stampmitra-php/' . \StampMitra\StampMitra::VERSION . ' (PHP ', $req->getHeaderLine('User-Agent'));
         self::assertStringContainsString('myapp/2.0', $req->getHeaderLine('User-Agent'));
         self::assertSame('{"pan":"ABCDE1234F","name":"Rahul Kumar"}', $fake->lastBody());
         self::assertNotSame('', $req->getHeaderLine('Idempotency-Key'));

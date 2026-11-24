@@ -82,6 +82,12 @@ abstract class Model implements \JsonSerializable
     }
 
     /** @param array<string, mixed> $d */
+    protected static function num(array $d, string $key): ?float
+    {
+        return isset($d[$key]) && is_numeric($d[$key]) ? (float) $d[$key] : null;
+    }
+
+    /** @param array<string, mixed> $d */
     protected static function bool(array $d, string $key): ?bool
     {
         return isset($d[$key]) && is_bool($d[$key]) ? $d[$key] : null;

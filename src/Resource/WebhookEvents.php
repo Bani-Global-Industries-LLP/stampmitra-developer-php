@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace StampMitra\Resource;
 
 use StampMitra\Http\RequestOptions;
+use StampMitra\Http\Transport;
 use StampMitra\Model\GenericResponse;
 
 final class WebhookEvents extends AbstractResource
@@ -16,12 +17,12 @@ final class WebhookEvents extends AbstractResource
     }
 
     /**
-     * POST /v1/webhooks/events/{id}/replay. Not retried automatically unless you pass an idempotencyKey.
+     * POST /v1/webhooks/events/{id}/replay. Never retried automatically and sent without an Idempotency-Key.
      *
      * @param RequestOptions|array<string, mixed>|null $options
      */
     public function replay(string $id, RequestOptions|array|null $options = null): GenericResponse
     {
-        return $this->call(GenericResponse::class, 'POST', '/v1/webhooks/events/' . $this->segment($id, 'id') . '/replay', null, [], $options);
+        return $this->call(GenericResponse::class, 'POST', '/v1/webhooks/events/' . $this->segment($id, 'id') . '/replay', null, [], $options, false, Transport::RETRY_NEVER);
     }
 }

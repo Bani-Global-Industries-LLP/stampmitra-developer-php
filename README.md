@@ -11,7 +11,7 @@ Official PHP client for the [StampMitra Developer API](https://developer.stampmi
 Indian identity verification (PAN, GSTIN, vehicle RC, Voter ID, driving licence, passport, CIN, Udyam, bank account)
 and e-Stamp Paper. OpenAPI spec: <https://developer.stampmitra.in/openapi.json>.
 
-> **Status: pre-1.0 (0.1.0).** The API surface may change in minor releases. Pin your version.
+> **Status: pre-1.0 (0.2.0).** The API surface may change in minor releases. Pin your version.
 
 SDK guide: <https://developer.stampmitra.in/sdks/php> | API docs: <https://developer.stampmitra.in/docs>
 
@@ -78,6 +78,7 @@ $client->estamp->listInstruments('MH');
 $client->estamp->listArticles('rent_agreement');
 $client->estamp->calculateDuty(['stateCode' => 'MH', 'articleCode' => '5']);
 $client->estamp->addParties('ord_123', ['customerName' => '...', 'partyName' => '...']);
+// more e-Stamp catalogue, orders, stamps and wallets: see the e-Stamp section below
 
 // Orders and payments
 $order = $client->orders->create(['externalOrderId' => 'o1', 'externalCustomerId' => 'c1', 'serviceCode' => 'estamp....']);
@@ -101,14 +102,88 @@ Responses are typed, immutable models (`$pan->registeredName`). Fields the SDK d
 (status, headers, request id, attempts) is available from `$pan->response()`. Endpoints whose schema the API
 does not fix yet (e-Stamp reference data) return `GenericResponse` (`->raw()`, `->get()`, `->items()`).
 
+## e-Stamp
+
+The typed e-Stamp API (contract 1.2.0) lives under `$client->estamp` (catalogue, `orders`, `stamps`) and the wallets under
+`$client->stampDutyWallet`, `$client->serviceFeeWallet` and `$client->account`. One order is one state, at most 5000 stamp lines,
+`quantity` at most 1000 per line. A line is an array or an `EstampStampLine`; `firstParty` / `secondParty` are a name string or an
+`EstampParty` (`name`, `address`, `phone`, `fatherHusbandName`, `gender` MALE|FEMALE|OTHER); `propertyArea` is an `EstampPropertyArea`
+(`Square Feet`, `Square Yard`, `Square Meters` or `Not Applicable`, plus `value`).
+
+```php
+use StampMitra\Model\EstampParty;
+use StampMitra\Model\EstampStampLine;
+use StampMitra\StampMitra;
+
+$client = new StampMitra();
+
+// What does the state need? ->exampleBody is a ready-to-edit order body.
+$req = $client->estamp->getStateRequirements('MH', articleCode: 'ART1', denomination: 500, category: 'e_stamp');
+
+$body = ['reference' => 'order-2026-0917', 'stamps' => [
+    new EstampStampLine('MH', 'ART1', 500, new EstampParty('Jane Doe', 'Pune'), 'Acme Pvt Ltd', clientReference: 'line-001', purpose: 'Rental Agreement'),
+]];
+
+$check = $client->estamp->orders->validate($body);                       // dry run: nothing created, not billed
+if (!$check->valid) { /* show $check->errors / $check->warnings */ }
+
+// Creating an order debits both wallets. The API requires an Idempotency-Key: the SDK generates one and reuses it on retries;
+// pass your own (['idempotencyKey' => 'order-2026-0917']) to make a retry from your side safe too.
+$order = $client->estamp->orders->create($body);
+
+$client->estamp->orders->uploadDocument($order->id, '/path/to/pan.pdf');  // PDF, JPEG or PNG, up to 10 MB (multipart)
+foreach ($client->estamp->orders->listStamps($order->id)->items as $stamp) {
+    $cert = $client->estamp->stamps->getCertificate($stamp->id);
+    if ($cert->available) { echo $cert->downloadUrl; }                    // short-lived (5 min): download and store it
+}
+```
+
+The PAN card is **advisory**: an order is never held back without it. Send `panCardImage` (an https link) on a line, upload it to
+the order as above, or link it later with `$client->estamp->stamps->setPanCard($stampId, 'https://...')` (answers 202, processed
+asynchronously: poll `stamps->get()` and read `panCard`). Creating an order does not place it with the issuing side: the returned
+`status` is a pre-placement status.
+
+Other calls: `estamp->getStatesAvailability()`, `getState()`, `listDistricts()`, `listSros()`, `getWallet()`;
+`orders->list()`, `get()`, `cancel()`, `export()`; `stamps->get()`, `cancel()`, `replace()`; `account->balance()`, `account->usage()`.
+
+### Wallets
+
+Each wallet has `balance()`, `topup($baseAmount)`, `listTransactions()`, `listInvoices()` and `getInvoice($id)`.
+A Stamp Duty top-up adds a 6% processing fee plus 18% GST on that fee to the amount you add; the wallet is credited the amount added
+in full, and a GST tax invoice for the fee is available from `listInvoices()` / `getInvoice()`. A Service Fee top-up adds GST on
+the amount. **The SDK never computes fees or GST: show your payer the figures from the response**, because the rates can change.
+In the Stamp Duty result `baseAmount`, `gstAmount` and `totalCharged` are numbers (`float`), `processingFeePercent`,
+`processingFeeAmount` and `creditAmount` are strings, and `topupId` is only set on live keys; every Service Fee amount is a string.
+
+```php
+$t = $client->stampDutyWallet->topup(1000);
+echo "pay {$t->totalCharged} (fee {$t->processingFeeAmount} at {$t->processingFeePercent}%, GST {$t->gstAmount}); wallet credited {$t->creditAmount}";
+```
+
+### e-Stamp errors
+
+On a rejected order body `$e->getFieldErrors()` lists every finding as a `FieldError` (`field`, `code`, `message`, `index`); on a 402
+`$e->getWallet()` is `STAMP_DUTY` or `SERVICE_FEE` (top that wallet up, then retry with the same key); `$e->getDetails()` returns
+`error.details`; `$e->getErrorCode()` is `error.code` (for example `IDEMPOTENCY_KEY_REUSED` on a 422).
+
+```php
+try {
+    $client->estamp->orders->create($body);
+} catch (\StampMitra\Exception\PaymentRequiredError $e) {
+    echo 'top up the ', $e->getWallet(), ' wallet';
+} catch (\StampMitra\Exception\ValidationError $e) {
+    foreach ($e->getFieldErrors() as $f) { echo "$f->field: $f->code $f->message\n"; }
+}
+```
+
 ## Errors
 
 All errors extend `StampMitra\Exception\StampMitraError` (`getStatus()`, `getErrorCode()`, `getMessage()`,
-`getRequestId()`, `getField()`, `getBody()`):
+`getRequestId()`, `getField()`, `getBody()`, plus `getDetails()`, `getFieldErrors()`, `getWallet()` and `getRetryAfter()`, see [e-Stamp errors](#e-stamp-errors)):
 
 | HTTP | Exception |
 |------|-----------|
-| 400 (and local validation) | `ValidationError` |
+| 400, 422 (and local validation) | `ValidationError` |
 | 401 | `AuthenticationError` |
 | 402 | `PaymentRequiredError` |
 | 403 | `PermissionError` (server message verbatim, e.g. IP allowlist) |
@@ -132,11 +207,11 @@ try {
 
 ## Retries and idempotency
 
-Default `maxRetries` is 2 with exponential backoff and full jitter (0.5s base, 8s cap); `Retry-After` is honoured when sent.
-`Retry-After` waits are capped at 60s. Retried: 429, 502, 503, 504, connection errors and timeouts. GET is always retry-safe. A POST is retried only when it carries an
+Default `maxRetries` is 2 with exponential backoff and full jitter (0.5s base, 8s cap); `Retry-After` (seconds) is honoured on 429, 503 and 409 `IDEMPOTENCY_IN_PROGRESS` when sent.
+`Retry-After` waits are capped at 60s. Retried: 429, 502, 503, 504, connection errors and timeouts, and a 409 `IDEMPOTENCY_IN_PROGRESS` for a request that carries a key (any other 409 is a state conflict and is never retried). GET is always retry-safe. A POST is retried only when it carries an
 `Idempotency-Key`. The SDK generates a UUIDv4 key for every POST the API documents the header for (verification, duty calculation,
 e-Stamp parties, orders, payment intents) and re-uses the **same key across retries**; pass your own with
-`['idempotencyKey' => '...']`. Other POSTs (webhook replay) are never retried unless you supply a key.
+`['idempotencyKey' => '...']`. `POST /v1/estamp/orders` also requires a key, so the SDK always sends one. The dry-run `orders->validate()` is retry-safe and retried without a key. **Never auto-retried, and sent without a key:** order cancel, stamp cancel, stamp replace, PAN card link, both wallet top-ups and webhook replay.
 
 ### Timeouts
 
@@ -205,6 +280,8 @@ Per-call rates by plan, in rupees, excluding 18% GST:
 | IP allowlisting | No | No | Yes | Yes | Yes | Yes |
 | White-label and custom domain | No | No | No | Yes | No | Yes |
 
+API e-Stamp orders are charged per paper as a procurement charge plus an API charge (ex-GST); see [developer.stampmitra.in/pricing](https://developer.stampmitra.in/pricing) for current rates.
+
 Growth and Scale are also available yearly (₹9,990 and ₹49,990, two months free). There are separate Startup and NGO programmes. Plans, rates and limits can change, and [developer.stampmitra.in/pricing](https://developer.stampmitra.in/pricing) is the source of truth; see it for how an e-Stamp order is priced in total.
 
 ## Security
@@ -229,7 +306,7 @@ composer install && composer test && composer stan && composer cs && composer co
 MOCK_SERVER_URL=http://127.0.0.1:4010 composer test:conformance
 ```
 
-`spec/openapi.json` is a snapshot of the public spec; `composer coverage:spec` (and a unit test) fail if any `METHOD + path`
+`spec/openapi.json` (contract 1.2.0, 62 operations) is a snapshot of the public spec; `composer coverage:spec` (and a unit test) fail if any `METHOD + path`
 in it has no SDK method. See [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md), [SECURITY.md](SECURITY.md).
 
 Licensed under the [MIT License](LICENSE). Copyright Bani Global Industries LLP (StampMitra).
