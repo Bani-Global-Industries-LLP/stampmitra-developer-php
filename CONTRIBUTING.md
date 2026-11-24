@@ -12,7 +12,7 @@ composer cs            # PHP-CS-Fixer dry run (PSR-12); composer cs:fix to apply
 composer coverage:spec # every operation in spec/openapi.json must have an SDK method
 ```
 
-Conformance run (all 31 operations, error mapping, retries, idempotency, timeouts, pagination, shared fixtures) against the
+Conformance run (all 62 operations (the 31 added in 1.2.0 through fixture replay), error mapping, retries, idempotency, timeouts, pagination, shared fixtures) against the
 spec repo's mock server:
 
 ```bash
@@ -21,7 +21,7 @@ node ../stampmitra-developer-openapi/scripts/mock-server.mjs --port 4010 &
 MOCK_SERVER_URL=http://127.0.0.1:4010 composer test:conformance   # skipped when MOCK_SERVER_URL is unset; CI sets CONFORMANCE_REQUIRED=1
 ```
 
-`tests/fixtures/*.json` are copies of the shared fixtures in the spec repo: refresh them when it changes.
+`tests/fixtures/*.json` and `tests/fixtures/operations/*.json` are copies of the shared fixtures in the spec repo: refresh them (and `spec/openapi.json`) when it changes. `composer test` also replays the fixtures with a scripted client, no mock server needed.
 
 ### Restricted networks
 

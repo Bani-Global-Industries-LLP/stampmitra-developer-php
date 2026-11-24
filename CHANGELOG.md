@@ -6,6 +6,26 @@ to [Semantic Versioning](https://semver.org/) (pre-1.0: minor versions may break
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-24
+
+Tracks API contract 1.2.0 (62 operations, was 31).
+
+### Added
+- e-Stamp catalogue: `estamp->getStatesAvailability()`, `getState()`, `getStateRequirements()` (with `exampleBody`), `listDistricts()`, `listSros()`.
+- e-Stamp orders `estamp->orders`: `validate()`, `create()` (Idempotency-Key auto-generated), `list()`, `get()`, `cancel()`, `export()`, `listStamps()`, `uploadDocument()` (multipart PAN card upload; PDF, JPEG or PNG, up to 10 MB).
+- Stamps `estamp->stamps`: `get()`, `cancel()`, `replace()`, `setPanCard()` (202), `getCertificate()`.
+- Wallets: `estamp->getWallet()`, `stampDutyWallet` and `serviceFeeWallet` (`balance()`, `topup()`, `listTransactions()`, `listInvoices()`, `getInvoice()`), and `account->balance()` / `account->usage()`.
+- Typed models (`EstampOrder`, `EstampStamp`, `EstampValidateResult`, `EstampDocument`, `EstampCertificate`, `StampDutyWalletTopup`, `ServiceFeeWalletTopup`, `WalletInvoice`, ...) and request helpers `EstampStampLine`, `EstampParty`, `EstampPropertyArea`.
+- Error accessors on every exception: `getDetails()`, `getFieldErrors()` (`FieldError`: field, code, message, index), `getWallet()` (`STAMP_DUTY` / `SERVICE_FEE` on a 402) and `getRetryAfter()`.
+- Tests that replay all 195 fixtures of the new operations (scripted client in `composer test`, mock server in `composer test:conformance`), including multipart, key generation, Retry-After and the never-retry set.
+
+### Changed
+- `Retry-After` is honoured on 503 and on 409 `IDEMPOTENCY_IN_PROGRESS` (a request carrying a key is retried), as well as on 429.
+- Order cancel, stamp cancel, stamp replace, PAN card link, both wallet top-ups and webhook replay are never auto-retried and never sent with an Idempotency-Key (webhook replay with a caller key used to be retried). `orders->validate()` is retry-safe without a key.
+- HTTP 422 raises `ValidationError` (was the base `StampMitraError`).
+- Multipart bodies are never written to the debug log.
+- Spec snapshot and shared fixtures refreshed to contract 1.2.0.
+
 ## [0.1.0] - 2026-10-16
 
 ### Added
@@ -18,5 +38,6 @@ to [Semantic Versioning](https://semver.org/) (pre-1.0: minor versions may break
 - Conformance suite (`composer test:conformance`) against the spec repo's mock server, run in CI.
 - `baseUrl` must be https (loopback http allowed); API key and webhook secret are `#[SensitiveParameter]` and hidden from dumps.
 
-[Unreleased]: https://github.com/Bani-Global-Industries-LLP/stampmitra-developer-php/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Bani-Global-Industries-LLP/stampmitra-developer-php/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Bani-Global-Industries-LLP/stampmitra-developer-php/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Bani-Global-Industries-LLP/stampmitra-developer-php/releases/tag/v0.1.0
