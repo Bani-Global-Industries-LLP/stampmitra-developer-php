@@ -30,6 +30,7 @@ final class ErrorMappingTest extends TestCase
             '403' => [403, PermissionError::class],
             '404' => [404, NotFoundError::class],
             '409' => [409, ConflictError::class],
+            '422' => [422, ValidationError::class],
             '429' => [429, RateLimitError::class],
             '500' => [500, UpstreamError::class],
             '502' => [502, UpstreamError::class],

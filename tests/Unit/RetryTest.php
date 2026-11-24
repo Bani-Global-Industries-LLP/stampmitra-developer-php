@@ -134,12 +134,16 @@ final class RetryTest extends TestCase
         }
     }
 
-    public function testKeyedReplayIsRetried(): void
+    public function testReplayIsNeverRetriedEvenWithAKeyAndSendsNoKey(): void
     {
         $fake = new FakeClient([$this->err(502), FakeClient::json(200, ['replayed' => true])]);
-        $res = $fake->client()->webhooks->events->replay('evt_1', ['idempotencyKey' => 'k1']);
-        self::assertTrue($res->get('replayed'));
-        self::assertCount(2, $fake->requests);
+        try {
+            $fake->client()->webhooks->events->replay('evt_1', ['idempotencyKey' => 'k1']);
+            self::fail('expected exception');
+        } catch (UpstreamError) {
+            self::assertCount(1, $fake->requests);
+            self::assertSame('', $fake->requests[0]->getHeaderLine('Idempotency-Key'));
+        }
     }
 
     public function testGetRetriesConnectionErrorsThenRaises(): void
