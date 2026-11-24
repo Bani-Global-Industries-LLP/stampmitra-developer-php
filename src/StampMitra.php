@@ -13,11 +13,14 @@ use Psr\Log\LoggerInterface;
 use StampMitra\Exception\AuthenticationError;
 use StampMitra\Exception\ValidationError;
 use StampMitra\Http\Transport;
+use StampMitra\Resource\Account;
 use StampMitra\Resource\Estamp;
 use StampMitra\Resource\Logs;
 use StampMitra\Resource\Orders;
 use StampMitra\Resource\Payments;
+use StampMitra\Resource\ServiceFeeWallet;
 use StampMitra\Resource\Services;
+use StampMitra\Resource\StampDutyWallet;
 use StampMitra\Resource\Usage;
 use StampMitra\Resource\Verify;
 use StampMitra\Resource\Webhooks;
@@ -32,7 +35,7 @@ use StampMitra\Resource\Webhooks;
  */
 final class StampMitra
 {
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.0';
     public const DEFAULT_BASE_URL = 'https://api-b2b.stampmitra.in';
     private const KEY_PATTERN = '/^sk_(test|live)_[A-Za-z0-9_-]{8,}$/';
 
@@ -44,6 +47,9 @@ final class StampMitra
     public readonly Usage $usage;
     public readonly Logs $logs;
     public readonly Webhooks $webhooks;
+    public readonly StampDutyWallet $stampDutyWallet;
+    public readonly ServiceFeeWallet $serviceFeeWallet;
+    public readonly Account $account;
 
     /** 'test' or 'live' (or 'custom' when allowCustomKey is used with a non sk_ key). */
     public readonly string $environment;
@@ -126,6 +132,9 @@ final class StampMitra
         $this->usage = new Usage($transport, $validateInput);
         $this->logs = new Logs($transport, $validateInput);
         $this->webhooks = new Webhooks($transport, $validateInput);
+        $this->stampDutyWallet = new StampDutyWallet($transport, $validateInput);
+        $this->serviceFeeWallet = new ServiceFeeWallet($transport, $validateInput);
+        $this->account = new Account($transport, $validateInput);
     }
 
     /** The API key travels in the Authorization header, so plain http is only allowed for loopback hosts (mock servers, tests). */
