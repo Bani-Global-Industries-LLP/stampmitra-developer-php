@@ -36,11 +36,22 @@ use StampMitra\Support\Uuid;
  *    key to every POST the API documents it for (verification, duty, parties,
  *    orders, payment intents), so those are retry-safe; other POSTs (webhook
  *    replay) are never retried unless the caller supplies a key.
- *  - Retried: 429, 502, 503, 504, connection errors, timeouts.
+ *  - RETRY_NEVER operations are never retried; RETRY_SAFE POSTs (validate) are
+ *    retried like a GET.
+ *  - Retried: 429, 502, 503, 504, connection errors, timeouts, and 409
+ *    IDEMPOTENCY_IN_PROGRESS (requests carrying a key only). Retry-After
+ *    (seconds, capped at 60) replaces the computed backoff.
  *  - The same Idempotency-Key is re-used for every attempt.
  */
 final class Transport
 {
+    /** GET is retry-safe, a POST only with an Idempotency-Key. */
+    public const RETRY_DEFAULT = 'default';
+    /** Never auto-retried and never sent with an Idempotency-Key (cancel, replace, pan-card link, wallet top-ups, webhook replay). */
+    public const RETRY_NEVER = 'never';
+    /** Retry-safe without a key (unbilled dry run such as order validation). */
+    public const RETRY_SAFE = 'safe';
+
     private const RETRY_STATUSES = [429, 502, 503, 504];
     private const BACKOFF_BASE_SECONDS = 0.5;
     private const BACKOFF_CAP_SECONDS = 8.0;
@@ -86,6 +97,8 @@ final class Transport
      * @param array<string, mixed>|null $body
      * @param array<string, scalar|null> $query
      * @param bool $autoIdempotency Generate an Idempotency-Key when the caller did not pass one
+     * @param list<array{name: string, contents: string, filename?: string, contentType?: string}>|null $multipart multipart/form-data parts (replaces $body)
+     * @param string $retry One of the RETRY_* constants
      */
     public function request(
         string $method,
@@ -94,21 +107,23 @@ final class Transport
         array $query = [],
         ?RequestOptions $options = null,
         bool $autoIdempotency = false,
+        ?array $multipart = null,
+        string $retry = self::RETRY_DEFAULT,
     ): ApiResponse {
         $options ??= new RequestOptions();
-        $idempotencyKey = $options->idempotencyKey;
-        if ($idempotencyKey === null && $autoIdempotency) {
+        $idempotencyKey = $retry === self::RETRY_NEVER ? null : $options->idempotencyKey;
+        if ($idempotencyKey === null && $autoIdempotency && $retry !== self::RETRY_NEVER) {
             $idempotencyKey = Uuid::v4();
         }
         $isGet = $method === 'GET';
-        $retrySafe = $isGet || $idempotencyKey !== null;
+        $retrySafe = $retry !== self::RETRY_NEVER && ($isGet || $idempotencyKey !== null || $retry === self::RETRY_SAFE);
         $maxRetries = max(0, $options->maxRetries ?? $this->maxRetries);
         $timeout = $options->timeout ?? $this->timeout;
 
         $attempt = 0;
         while (true) {
             ++$attempt;
-            $request = $this->buildRequest($method, $path, $body, $query, $options, $idempotencyKey);
+            $request = $this->buildRequest($method, $path, $body, $query, $options, $idempotencyKey, $multipart);
             $this->logRequest($request, $attempt);
 
             try {
@@ -140,7 +155,8 @@ final class Transport
             }
 
             $error = $this->mapError($status, $text, $headers);
-            if ($retrySafe && $attempt <= $maxRetries && in_array($status, self::RETRY_STATUSES, true)) {
+            $inProgress = $status === 409 && $idempotencyKey !== null && $error->getErrorCode() === 'IDEMPOTENCY_IN_PROGRESS';
+            if ($retrySafe && $attempt <= $maxRetries && (in_array($status, self::RETRY_STATUSES, true) || $inProgress)) {
                 $retryAfter = $error instanceof RateLimitError ? $error->getRetryAfter() : $this->retryAfter($headers);
                 $this->pause($retryAfter !== null ? min($retryAfter, self::RETRY_AFTER_CAP_SECONDS) : $this->backoff($attempt));
                 continue;
@@ -165,6 +181,7 @@ final class Transport
     /**
      * @param array<string, mixed>|null $body
      * @param array<string, scalar|null> $query
+     * @param list<array{name: string, contents: string, filename?: string, contentType?: string}>|null $multipart
      */
     private function buildRequest(
         string $method,
@@ -173,6 +190,7 @@ final class Transport
         array $query,
         RequestOptions $options,
         ?string $idempotencyKey,
+        ?array $multipart = null,
     ): RequestInterface {
         $url = rtrim($this->baseUrl, '/') . $path;
         $params = [];
@@ -189,8 +207,14 @@ final class Transport
         $request = $this->requestFactory->createRequest($method, $url)
             ->withHeader('Authorization', 'Bearer ' . $this->apiKey)
             ->withHeader('Accept', 'application/json')
-            ->withHeader('Content-Type', 'application/json')
             ->withHeader('User-Agent', $this->userAgent);
+        $boundary = null;
+        if ($multipart !== null) {
+            $boundary = 'stampmitra-' . bin2hex(random_bytes(12));
+            $request = $request->withHeader('Content-Type', 'multipart/form-data; boundary=' . $boundary);
+        } else {
+            $request = $request->withHeader('Content-Type', 'application/json');
+        }
 
         foreach ($this->defaultHeaders as $name => $value) {
             $request = $request->withHeader($name, $value);
@@ -201,12 +225,34 @@ final class Transport
         if ($idempotencyKey !== null) {
             $request = $request->withHeader('Idempotency-Key', $idempotencyKey);
         }
-        if ($method !== 'GET') {
+        if ($multipart !== null && $boundary !== null) {
+            $request = $request->withBody($this->streamFactory->createStream($this->multipartBody($multipart, $boundary)));
+        } elseif ($method !== 'GET') {
             $json = json_encode($body === null || $body === [] ? new \stdClass() : $body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             $request = $request->withBody($this->streamFactory->createStream($json));
         }
 
         return $request;
+    }
+
+    /** @param list<array{name: string, contents: string, filename?: string, contentType?: string}> $parts */
+    private function multipartBody(array $parts, string $boundary): string
+    {
+        $quote = static fn (string $v): string => str_replace(['\\', '"', "\r", "\n"], ['\\\\', '%22', '', ''], $v);
+        $out = '';
+        foreach ($parts as $part) {
+            $out .= "--$boundary\r\nContent-Disposition: form-data; name=\"" . $quote($part['name']) . '"';
+            if (isset($part['filename'])) {
+                $out .= '; filename="' . $quote($part['filename']) . '"';
+            }
+            $out .= "\r\n";
+            if (isset($part['contentType'])) {
+                $out .= 'Content-Type: ' . $part['contentType'] . "\r\n";
+            }
+            $out .= "\r\n" . $part['contents'] . "\r\n";
+        }
+
+        return $out . "--$boundary--\r\n";
     }
 
     private function send(RequestInterface $request, float $timeout): ResponseInterface
@@ -280,7 +326,7 @@ final class Transport
         $field = isset($err['field']) && is_string($err['field']) ? $err['field'] : null;
         $requestId = isset($err['requestId']) && is_string($err['requestId']) ? $err['requestId'] : $this->headerValue($headers, 'x-request-id');
         return match (true) {
-            $status === 400 => new ValidationError($message, $status, $code, $requestId, $body, $field, $headers),
+            $status === 400 || $status === 422 => new ValidationError($message, $status, $code, $requestId, $body, $field, $headers),
             $status === 401 => new AuthenticationError($message, $status, $code, $requestId, $body, $field, $headers),
             $status === 402 => new PaymentRequiredError($message, $status, $code, $requestId, $body, $field, $headers),
             $status === 403 => new PermissionError($message, $status, $code, $requestId, $body, $field, $headers),
@@ -333,7 +379,7 @@ final class Transport
             'url' => (string) $request->getUri(),
             'attempt' => $attempt,
             'headers' => Redactor::headers(array_map(static fn (array $v): array => array_values($v), $request->getHeaders())),
-            'body' => Redactor::body((string) $request->getBody()),
+            'body' => str_starts_with($request->getHeaderLine('Content-Type'), 'multipart/') ? '[multipart body omitted]' : Redactor::body((string) $request->getBody()),
         ]);
     }
 

@@ -34,8 +34,29 @@ abstract class AbstractResource
         array $query = [],
         RequestOptions|array|null $options = null,
         bool $autoIdempotency = false,
+        string $retry = Transport::RETRY_DEFAULT,
     ): Model {
-        $response = $this->transport->request($method, $path, $body, $query, RequestOptions::from($options), $autoIdempotency);
+        $response = $this->transport->request($method, $path, $body, $query, RequestOptions::from($options), $autoIdempotency, null, $retry);
+
+        return $this->hydrate($class, $response);
+    }
+
+    /**
+     * @template T of Model
+     * @param class-string<T> $class
+     * @param list<array{name: string, contents: string, filename?: string, contentType?: string}> $parts
+     * @param RequestOptions|array<string, mixed>|null $options
+     * @return T
+     */
+    protected function callMultipart(
+        string $class,
+        string $method,
+        string $path,
+        array $parts,
+        RequestOptions|array|null $options = null,
+        bool $autoIdempotency = false,
+    ): Model {
+        $response = $this->transport->request($method, $path, null, [], RequestOptions::from($options), $autoIdempotency, $parts);
 
         return $this->hydrate($class, $response);
     }
