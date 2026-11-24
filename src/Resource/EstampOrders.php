@@ -136,7 +136,7 @@ final class EstampOrders extends AbstractResource
                 throw ValidationError::forField('stamps', 'an order holds at most ' . self::MAX_LINES . ' stamp lines');
             }
             $states = [];
-            foreach (array_values($body['stamps']) as $i => $line) {
+            foreach ($body['stamps'] as $i => $line) {
                 if (!is_array($line)) {
                     throw ValidationError::forField("stamps[$i]", 'a stamp line must be an array or an EstampStampLine');
                 }

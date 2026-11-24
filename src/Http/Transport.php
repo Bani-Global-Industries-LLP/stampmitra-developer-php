@@ -225,7 +225,7 @@ final class Transport
         if ($idempotencyKey !== null) {
             $request = $request->withHeader('Idempotency-Key', $idempotencyKey);
         }
-        if ($multipart !== null && $boundary !== null) {
+        if ($multipart !== null) {
             $request = $request->withBody($this->streamFactory->createStream($this->multipartBody($multipart, $boundary)));
         } elseif ($method !== 'GET') {
             $json = json_encode($body === null || $body === [] ? new \stdClass() : $body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);

@@ -126,7 +126,7 @@ final class FixtureOperations
             }
             $re = '#^' . preg_replace('/\\\\\{\w+\\\\\}/', '([^/]+)', preg_quote($template, '#')) . '$#';
             if (preg_match((string) $re, $path, $match) === 1) {
-                $params = array_map('rawurldecode', array_slice($match, 1));
+                $params = array_values(array_map('rawurldecode', array_slice($match, 1)));
                 // literal segments (states/availability, orders/validate) beat {param} segments
                 if ($found === null || count($params) < count($found[1])) {
                     $found = [$key, $params];
