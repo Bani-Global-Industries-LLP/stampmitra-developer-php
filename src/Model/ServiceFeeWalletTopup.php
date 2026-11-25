@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace StampMitra\Model;
 
 /**
- * Service Fee wallet top-up. Every amount is a string.
+ * Service wallet top-up (the class name is kept for compatibility; minimum Rs 1,000 plus 18% GST). Every amount is a string.
  */
 final class ServiceFeeWalletTopup extends Model
 {

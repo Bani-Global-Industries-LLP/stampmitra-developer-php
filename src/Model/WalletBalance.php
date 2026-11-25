@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace StampMitra\Model;
 
 /**
- * Balance of the Stamp Duty or Service Fee wallet (a decimal string, in rupees).
+ * Balance of the Stamp duty wallet or the Service wallet (a decimal string, in rupees).
  */
 final class WalletBalance extends Model
 {

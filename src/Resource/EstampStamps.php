@@ -42,7 +42,7 @@ final class EstampStamps extends AbstractResource
 
     /**
      * POST /v1/estamp/stamps/{stampId}/pan-card: link the payer's PAN card by https URL. Answers 202
-     * (processed asynchronously: poll get() and read panCard). Advisory. Never retried automatically.
+     * (processed asynchronously: poll get() and read panCard). A PAN card is mandatory to complete the stamp. Never retried automatically.
      *
      * @param RequestOptions|array<string, mixed>|null $options
      */

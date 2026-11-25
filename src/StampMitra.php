@@ -35,7 +35,7 @@ use StampMitra\Resource\Webhooks;
  */
 final class StampMitra
 {
-    public const VERSION = '0.2.0';
+    public const VERSION = '0.2.1';
     public const DEFAULT_BASE_URL = 'https://api-b2b.stampmitra.in';
     private const KEY_PATTERN = '/^sk_(test|live)_[A-Za-z0-9_-]{8,}$/';
 

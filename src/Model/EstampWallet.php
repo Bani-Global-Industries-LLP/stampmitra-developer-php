@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace StampMitra\Model;
 
 /**
- * Both wallets in one call.
+ * Both wallets in one call: the Stamp duty wallet and the Service wallet (kept under the name serviceFee for compatibility).
  */
 final class EstampWallet extends Model
 {

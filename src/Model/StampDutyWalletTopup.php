@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace StampMitra\Model;
 
 /**
- * Stamp Duty wallet top-up. baseAmount, gstAmount and totalCharged are numbers; the other amounts are strings. Show these figures to your payer; the SDK never computes fees.
+ * Stamp duty wallet top-up. baseAmount, gstAmount and totalCharged are numbers; the other amounts are strings. Show these figures to your payer; the SDK never computes fees.
  */
 final class StampDutyWalletTopup extends Model
 {

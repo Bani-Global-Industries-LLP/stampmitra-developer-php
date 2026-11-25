@@ -118,7 +118,7 @@ final class Estamp extends AbstractResource
     }
 
     /**
-     * GET /v1/estamp/wallet: both wallets (needs the Stamp Duty and Service Fee read scopes).
+     * GET /v1/estamp/wallet: both wallets, the Stamp duty wallet and the Service wallet (needs both wallet read scopes).
      *
      * @param RequestOptions|array<string, mixed>|null $options
      */
