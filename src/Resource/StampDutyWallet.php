@@ -14,7 +14,7 @@ use StampMitra\Model\WalletInvoice;
 use StampMitra\Model\WalletInvoicePage;
 
 /**
- * Stamp Duty wallet (`$client->stampDutyWallet`). topup() adds a 6% processing fee plus 18% GST on that fee to baseAmount; the wallet is credited baseAmount in full and a GST tax invoice for the fee is available from listInvoices()/getInvoice().
+ * Stamp duty wallet (`$client->stampDutyWallet`): holds the statutory duty that orders debit. topup() adds a 6% processing fee plus 18% GST on that fee to baseAmount; the wallet is credited baseAmount in full and a GST tax invoice for the fee is available from listInvoices()/getInvoice().
  * Top-ups are never retried automatically and carry no Idempotency-Key. Show
  * your payer the amounts from the response: the SDK never computes fees or GST.
  */

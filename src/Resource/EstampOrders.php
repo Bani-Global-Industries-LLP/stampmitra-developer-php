@@ -39,7 +39,7 @@ final class EstampOrders extends AbstractResource
     /**
      * POST /v1/estamp/orders. The API requires an Idempotency-Key: one is
      * generated when you do not pass `idempotencyKey` in the options, and it
-     * is reused across automatic retries. This debits both wallets: a 402
+     * is reused across automatic retries. This debits the Stamp duty wallet (duty) and the Service wallet (fees, before GST): a 402
      * says which one is short (`$e->getWallet()`).
      *
      * @param array<string, mixed> $body {reference?, stamps: list<array|EstampStampLine>}
@@ -94,7 +94,8 @@ final class EstampOrders extends AbstractResource
 
     /**
      * POST /v1/estamp/orders/{orderId}/documents (multipart/form-data): attach the
-     * payer's PAN card. Advisory: an order is never held back without it.
+     * payer's PAN card. An order can be placed without it, but a PAN card is mandatory
+     * to complete the stamp.
      *
      * $file is a path to a PDF, JPEG or PNG (at most 10 MB), an open stream, or
      * ['contents' => string, 'filename' => string, 'contentType' => ?string]. The

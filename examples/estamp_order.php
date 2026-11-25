@@ -39,7 +39,7 @@ try {
     // Creating an order debits both wallets. The same idempotency key replays the same order, so a retry never creates a second one.
     $order = $client->estamp->orders->create($body, ['idempotencyKey' => 'order-2026-0917']);
 } catch (PaymentRequiredError $e) {
-    echo 'Top up the ', $e->getWallet() ?? 'Stamp Duty or Service Fee', " wallet first.\n";
+    echo 'Top up the ', $e->getWallet() ?? 'Stamp duty or Service', " wallet first.\n";
     exit(1);
 } catch (ValidationError $e) {
     foreach ($e->getFieldErrors() as $issue) {
@@ -49,7 +49,7 @@ try {
 }
 echo 'order ', (string) $order->id, ' ', (string) $order->status, "\n";
 
-// The PAN card is advisory: the order is never held back without it.
+// The PAN card: an order can be placed without it, but a PAN card is mandatory to complete the stamp.
 $client->estamp->orders->uploadDocument((string) $order->id, __DIR__ . '/pan.pdf');
 
 foreach ($client->estamp->orders->listStamps((string) $order->id)->items as $stamp) {

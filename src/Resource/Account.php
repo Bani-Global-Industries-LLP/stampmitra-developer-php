@@ -11,7 +11,7 @@ use StampMitra\Model\GenericResponse;
 final class Account extends AbstractResource
 {
     /**
-     * GET /v1/account/balance.
+     * GET /v1/account/balance: the Service wallet balance.
      *
      * @param RequestOptions|array<string, mixed>|null $options
      */

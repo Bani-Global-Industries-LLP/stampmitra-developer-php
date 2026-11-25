@@ -14,7 +14,9 @@ use StampMitra\Model\WalletInvoice;
 use StampMitra\Model\WalletInvoicePage;
 
 /**
- * Service Fee wallet (`$client->serviceFeeWallet`). topup() adds GST on baseAmount and the wallet is credited baseAmount.
+ * Service wallet (`$client->serviceFeeWallet`; the name is kept for compatibility): one balance that pays verification calls
+ * and the e-Stamp fees. Minimum top-up is Rs 1,000 plus 18% GST; GST on fees is paid at top-up, so orders debit the fees before
+ * GST. topup() adds GST on baseAmount and the wallet is credited baseAmount.
  * Top-ups are never retried automatically and carry no Idempotency-Key. Show
  * your payer the amounts from the response: the SDK never computes fees or GST.
  */

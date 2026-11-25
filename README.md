@@ -11,7 +11,7 @@ Official PHP client for the [StampMitra Developer API](https://developer.stampmi
 Indian identity verification (PAN, GSTIN, vehicle RC, Voter ID, driving licence, passport, CIN, Udyam, bank account)
 and e-Stamp Paper. OpenAPI spec: <https://developer.stampmitra.in/openapi.json>.
 
-> **Status: pre-1.0 (0.2.0).** The API surface may change in minor releases. Pin your version.
+> **Status: pre-1.0 (0.2.1).** The API surface may change in minor releases. Pin your version.
 
 SDK guide: <https://developer.stampmitra.in/sdks/php> | API docs: <https://developer.stampmitra.in/docs>
 
@@ -105,7 +105,7 @@ does not fix yet (e-Stamp reference data) return `GenericResponse` (`->raw()`, `
 ## e-Stamp
 
 The typed e-Stamp API (contract 1.2.0) lives under `$client->estamp` (catalogue, `orders`, `stamps`) and the wallets under
-`$client->stampDutyWallet`, `$client->serviceFeeWallet` and `$client->account`. One order is one state, at most 5000 stamp lines,
+`$client->stampDutyWallet` (Stamp duty wallet), `$client->serviceFeeWallet` (Service wallet; name kept for compatibility) and `$client->account`. One order is one state, at most 5000 stamp lines,
 `quantity` at most 1000 per line. A line is an array or an `EstampStampLine`; `firstParty` / `secondParty` are a name string or an
 `EstampParty` (`name`, `address`, `phone`, `fatherHusbandName`, `gender` MALE|FEMALE|OTHER); `propertyArea` is an `EstampPropertyArea`
 (`Square Feet`, `Square Yard`, `Square Meters` or `Not Applicable`, plus `value`).
@@ -127,7 +127,7 @@ $body = ['reference' => 'order-2026-0917', 'stamps' => [
 $check = $client->estamp->orders->validate($body);                       // dry run: nothing created, not billed
 if (!$check->valid) { /* show $check->errors / $check->warnings */ }
 
-// Creating an order debits both wallets. The API requires an Idempotency-Key: the SDK generates one and reuses it on retries;
+// Creating an order debits the Stamp duty wallet (duty) and the Service wallet (fees, before GST). The API requires an Idempotency-Key: the SDK generates one and reuses it on retries;
 // pass your own (['idempotencyKey' => 'order-2026-0917']) to make a retry from your side safe too.
 $order = $client->estamp->orders->create($body);
 
@@ -138,7 +138,7 @@ foreach ($client->estamp->orders->listStamps($order->id)->items as $stamp) {
 }
 ```
 
-The PAN card is **advisory**: an order is never held back without it. Send `panCardImage` (an https link) on a line, upload it to
+An order can be placed without the PAN card, but a PAN card is **mandatory to complete the stamp** (the SDK's validation is unchanged; the API may flag a missing card with the `PAN_CARD_RECOMMENDED` advisory). Send `panCardImage` (an https link) on a line, upload it to
 the order as above, or link it later with `$client->estamp->stamps->setPanCard($stampId, 'https://...')` (answers 202, processed
 asynchronously: poll `stamps->get()` and read `panCard`). Creating an order does not place it with the issuing side: the returned
 `status` is a pre-placement status.
@@ -148,12 +148,22 @@ Other calls: `estamp->getStatesAvailability()`, `getState()`, `listDistricts()`,
 
 ### Wallets
 
+Two prepaid wallets back your account:
+
+- The **Service wallet** is one balance. It pays verification calls and the e-Stamp fees (procurement charge, API charge and
+  convenience fee). Top it up by at least ₹1,000 plus 18% GST. GST on fees is paid at top-up, so an order debits the fees before GST.
+- The **Stamp duty wallet** holds the statutory stamp duty that orders debit.
+
+The Service wallet is `$client->serviceFeeWallet` (the name is kept for compatibility) and the Stamp duty wallet is
+`$client->stampDutyWallet`. In API responses and errors the wallet names stay `SERVICE_FEE` and `STAMP_DUTY` (for example
+`details.wallet`). There is no signup credit for new accounts.
+
 Each wallet has `balance()`, `topup($baseAmount)`, `listTransactions()`, `listInvoices()` and `getInvoice($id)`.
-A Stamp Duty top-up adds a 6% processing fee plus 18% GST on that fee to the amount you add; the wallet is credited the amount added
-in full, and a GST tax invoice for the fee is available from `listInvoices()` / `getInvoice()`. A Service Fee top-up adds GST on
+A Stamp duty top-up adds a 6% processing fee plus 18% GST on that fee to the amount you add; the wallet is credited the amount added
+in full, and a GST tax invoice for the fee is available from `listInvoices()` / `getInvoice()`. A Service wallet top-up adds GST on
 the amount. **The SDK never computes fees or GST: show your payer the figures from the response**, because the rates can change.
-In the Stamp Duty result `baseAmount`, `gstAmount` and `totalCharged` are numbers (`float`), `processingFeePercent`,
-`processingFeeAmount` and `creditAmount` are strings, and `topupId` is only set on live keys; every Service Fee amount is a string.
+In the Stamp duty result `baseAmount`, `gstAmount` and `totalCharged` are numbers (`float`), `processingFeePercent`,
+`processingFeeAmount` and `creditAmount` are strings, and `topupId` is only set on live keys; every Service wallet amount is a string.
 
 ```php
 $t = $client->stampDutyWallet->topup(1000);
@@ -163,7 +173,7 @@ echo "pay {$t->totalCharged} (fee {$t->processingFeeAmount} at {$t->processingFe
 ### e-Stamp errors
 
 On a rejected order body `$e->getFieldErrors()` lists every finding as a `FieldError` (`field`, `code`, `message`, `index`); on a 402
-`$e->getWallet()` is `STAMP_DUTY` or `SERVICE_FEE` (top that wallet up, then retry with the same key); `$e->getDetails()` returns
+`$e->getWallet()` is `STAMP_DUTY` (Stamp duty wallet) or `SERVICE_FEE` (Service wallet) (top that wallet up, then retry with the same key); `$e->getDetails()` returns
 `error.details`; `$e->getErrorCode()` is `error.code` (for example `IDEMPOTENCY_KEY_REUSED` on a 422).
 
 ```php
@@ -260,7 +270,7 @@ and names in bodies are masked. Nothing is logged by default.
 
 ## Pricing
 
-The SDK is free and MIT-licensed. You pay only for successful API calls, from one prepaid wallet. Sandbox is free: mock data on every endpoint, and it never debits your wallet.
+The SDK is free and MIT-licensed. You pay only for successful API calls, from your prepaid Service wallet. There is no signup credit. Sandbox is free: mock data on every endpoint, and it never debits your Service wallet.
 
 Per-call rates by plan, in rupees, excluding 18% GST:
 
@@ -280,7 +290,7 @@ Per-call rates by plan, in rupees, excluding 18% GST:
 | IP allowlisting | No | No | Yes | Yes | Yes | Yes |
 | White-label and custom domain | No | No | No | Yes | No | Yes |
 
-API e-Stamp orders are charged per paper as a procurement charge plus an API charge (ex-GST); see [developer.stampmitra.in/pricing](https://developer.stampmitra.in/pricing) for current rates.
+API e-Stamp orders are priced per paper: ₹99 procurement charge, plus ₹5 API charge, plus a convenience fee (by default 5% of that paper's duty above ₹1,000). The duty is multiplied by the quantity. Sandbox quotes use the same default rates as live; rates agreed for your account are not applied in sandbox. The fees are debited from the Service wallet before GST (GST was paid when you topped up), and the duty from the Stamp duty wallet. See [developer.stampmitra.in/pricing](https://developer.stampmitra.in/pricing) for current rates.
 
 Growth and Scale are also available yearly (₹9,990 and ₹49,990, two months free). There are separate Startup and NGO programmes. Plans, rates and limits can change, and [developer.stampmitra.in/pricing](https://developer.stampmitra.in/pricing) is the source of truth; see it for how an e-Stamp order is priced in total.
 
